@@ -6,6 +6,8 @@ requires-python = ">=3.11"
 dependencies = [
     "winotify",
     "pyyaml",
+    "pystray",
+    "Pillow",
 ]
 
 [build-system]
@@ -18,3 +20,4 @@ packages = ["."]
 [project.scripts]
 desk-noti = "monitor:run"
 desk-noti-scheduler = "setup_scheduler:register"
+desk-noti-tray = "tray:main"
