@@ -2,15 +2,21 @@
 
 import ctypes
 import ctypes.wintypes
+import os
 import sys
 from pathlib import Path
 
 import yaml
 
-from rules import evaluate_folder
-from notifier import send_notification
+from rules import evaluate_bookmarks, evaluate_folder
+from notifier import send_bookmark_notification, send_notification
 
 CONFIG_PATH = Path(__file__).parent / "config.yaml"
+
+BOOKMARKS_PATH = (
+    Path(os.environ.get("LOCALAPPDATA", ""))
+    / "Google" / "Chrome" / "User Data" / "Default" / "Bookmarks"
+)
 
 # Windows Known Folder GUIDs
 _KNOWN_FOLDERS: dict[str, str] = {
@@ -80,6 +86,26 @@ def run() -> None:
             send_notification(report)
         else:
             print(f"[CLEAN] {report.path}: files={report.total_files}")
+
+    # 북마크 검사
+    bm_cfg = config.get("bookmarks", {})
+    if bm_cfg.get("enabled", True) and BOOKMARKS_PATH.exists():
+        bm_report = evaluate_bookmarks(
+            bookmarks_path=str(BOOKMARKS_PATH),
+            max_unsorted=bm_cfg.get("max_unsorted", 10),
+            max_duplicates=bm_cfg.get("max_duplicates", 5),
+            max_unused_percent=bm_cfg.get("max_unused_percent", 50),
+        )
+        if bm_report.level != "clean":
+            print(
+                f"[{bm_report.level.upper()}] 북마크: "
+                f"score={bm_report.score}, total={bm_report.total_bookmarks}"
+            )
+            for reason in bm_report.reasons:
+                print(f"  - {reason}")
+            send_bookmark_notification(bm_report)
+        else:
+            print(f"[CLEAN] 북마크: total={bm_report.total_bookmarks}")
 
 
 if __name__ == "__main__":

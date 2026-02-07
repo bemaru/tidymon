@@ -2,9 +2,9 @@
 
 from winotify import Notification, audio
 
-from rules import FolderReport
+from rules import BookmarkReport, FolderReport
 
-APP_ID = "DeskNoti"
+APP_ID = "TidyMon"
 
 LEVEL_CONFIG = {
     "caution": {
@@ -46,6 +46,29 @@ def send_notification(report: FolderReport) -> None:
     for reason in report.reasons:
         body_lines.append(f"  • {reason}")
     body_lines.append("정리가 필요합니다.")
+    body = "\n".join(body_lines)
+
+    toast = Notification(
+        app_id=APP_ID,
+        title=cfg["title"],
+        msg=body,
+        duration=cfg["duration"],
+    )
+    toast.set_audio(cfg["audio"], loop=False)
+    toast.show()
+
+
+def send_bookmark_notification(report: BookmarkReport) -> None:
+    """BookmarkReport를 기반으로 토스트 알림을 보낸다."""
+    if report.level == "clean":
+        return
+
+    cfg = LEVEL_CONFIG[report.level]
+
+    body_lines = [f"🔖 북마크 {report.total_bookmarks}개"]
+    for reason in report.reasons:
+        body_lines.append(f"  • {reason}")
+    body_lines.append("북마크 정리가 필요합니다.")
     body = "\n".join(body_lines)
 
     toast = Notification(

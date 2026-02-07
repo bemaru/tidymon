@@ -8,12 +8,12 @@ from pathlib import Path
 import pystray
 from PIL import Image, ImageDraw
 
-from monitor import CONFIG_PATH, load_config
-from notifier import send_notification
-from rules import FolderReport, evaluate_folder
+from monitor import BOOKMARKS_PATH, CONFIG_PATH, load_config
+from notifier import send_bookmark_notification, send_notification
+from rules import BookmarkReport, FolderReport, evaluate_bookmarks, evaluate_folder
 
 AUTOSTART_KEY = r"Software\Microsoft\Windows\CurrentVersion\Run"
-AUTOSTART_VALUE = "DeskNoti"
+AUTOSTART_VALUE = "TidyMon"
 
 LEVEL_COLORS = {
     "clean": (76, 175, 80),      # green
@@ -126,6 +126,7 @@ class TrayApp:
     def __init__(self) -> None:
         self.config = load_config()
         self.reports: list[FolderReport] = []
+        self.bookmark_report: BookmarkReport | None = None
         self._stop_event = threading.Event()
         self._scan_event = threading.Event()
         self.icon: pystray.Icon | None = None
@@ -153,19 +154,36 @@ class TrayApp:
             if report.level != "clean":
                 send_notification(report)
 
+        # 북마크 검사
+        bm_cfg = config.get("bookmarks", {})
+        if bm_cfg.get("enabled", True) and BOOKMARKS_PATH.exists():
+            self.bookmark_report = evaluate_bookmarks(
+                bookmarks_path=str(BOOKMARKS_PATH),
+                max_unsorted=bm_cfg.get("max_unsorted", 10),
+                max_duplicates=bm_cfg.get("max_duplicates", 5),
+                max_unused_percent=bm_cfg.get("max_unused_percent", 50),
+            )
+            if self.bookmark_report.level != "clean":
+                send_bookmark_notification(self.bookmark_report)
+        else:
+            self.bookmark_report = None
+
         self._update_icon()
 
     def _worst_level(self) -> str:
-        if not self.reports:
+        levels = [r.level for r in self.reports]
+        if self.bookmark_report is not None:
+            levels.append(self.bookmark_report.level)
+        if not levels:
             return "clean"
-        return max(self.reports, key=lambda r: LEVEL_PRIORITY[r.level]).level
+        return max(levels, key=lambda lv: LEVEL_PRIORITY[lv])
 
     def _update_icon(self) -> None:
         if self.icon is None:
             return
         level = self._worst_level()
         self.icon.icon = _make_icon(LEVEL_COLORS[level])
-        self.icon.title = f"DeskNoti - {LEVEL_LABEL[level]}"
+        self.icon.title = f"TidyMon - {LEVEL_LABEL[level]}"
         self.icon.menu = self._build_menu()
 
     # -- background loop --
@@ -183,6 +201,9 @@ class TrayApp:
 
     def _on_scan_now(self, icon: pystray.Icon, item: pystray.MenuItem) -> None:
         self._scan_event.set()
+
+    def _on_open_bookmarks(self, icon: pystray.Icon, item: pystray.MenuItem) -> None:
+        os.startfile("chrome://bookmarks")
 
     def _on_open_config(self, icon: pystray.Icon, item: pystray.MenuItem) -> None:
         os.startfile(str(CONFIG_PATH))
@@ -215,6 +236,12 @@ class TrayApp:
         if not self.reports:
             items.append(pystray.MenuItem("\U0001f4c1 (검사 대기 중...)", None, enabled=False))
 
+        # 북마크 상태
+        if self.bookmark_report is not None:
+            label = LEVEL_LABEL[self.bookmark_report.level]
+            text = f"\U0001f516 북마크: {label}"
+            items.append(pystray.MenuItem(text, self._on_open_bookmarks))
+
         items.append(pystray.Menu.SEPARATOR)
 
         # 설정 열기
@@ -238,9 +265,9 @@ class TrayApp:
 
     def run(self) -> None:
         self.icon = pystray.Icon(
-            name="DeskNoti",
+            name="TidyMon",
             icon=_make_icon(LEVEL_COLORS["clean"]),
-            title="DeskNoti - 시작 중...",
+            title="TidyMon - 시작 중...",
             menu=self._build_menu(),
         )
 

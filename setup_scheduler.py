@@ -6,7 +6,7 @@ from pathlib import Path
 
 import yaml
 
-TASK_NAME = "DeskNoti_Monitor"
+TASK_NAME = "TidyMon_Monitor"
 CONFIG_PATH = Path(__file__).parent / "config.yaml"
 MONITOR_SCRIPT = Path(__file__).parent / "monitor.py"
 

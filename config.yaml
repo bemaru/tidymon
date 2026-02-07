@@ -9,4 +9,9 @@ folders:
     max_extensions: 8
     max_stale_files: 10
     stale_days: 7
+bookmarks:
+  enabled: true
+  max_unsorted: 10
+  max_duplicates: 5
+  max_unused_percent: 50
 check_interval_minutes: 60
